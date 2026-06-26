@@ -46,4 +46,51 @@ services:
       - PORT=3000
       # Plain expansion (not :?) so `docker compose down`/`pull` still run when this is unset.
       # The panel itself refuses to start without it; set ADMIN_PANEL_SESSION_SECRET in .env.
-      - SESSION_SECRET=${ADMIN_PANEL_SESSION
+      - SESSION_SECRET=${ADMIN_PANEL_SESSION_SECRET}
+      - API_SERVER_URL=http://api:${PORT:-3080}
+      - VITE_API_BASE_URL=${DOMAIN_CLIENT:-http://localhost:3080}
+      - SESSION_COOKIE_SECURE=${ADMIN_PANEL_SESSION_COOKIE_SECURE:-false}
+  mongodb:
+    container_name: chat-mongodb
+    image: mongo:8.0.20
+    restart: always
+    user: "${UID}:${GID}"
+    volumes:
+      - mongo_data:/data/db
+    command: mongod --noauth
+  meilisearch:
+    container_name: chat-meilisearch
+    image: getmeili/meilisearch:v1.35.1
+    restart: always
+    user: "${UID}:${GID}"
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+    volumes:
+      - meili_data:/meili_data
+  vectordb:
+    container_name: vectordb
+    image: pgvector/pgvector:0.8.0-pg15-trixie
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    restart: always
+    volumes:
+      - pgdata2:/var/lib/postgresql/data
+  rag_api:
+    container_name: rag_api
+    image: registry.librechat.ai/danny-avila/librechat-rag-api-dev-lite:latest
+    environment:
+      - DB_HOST=vectordb
+      - RAG_PORT=${RAG_PORT:-8000}
+    restart: always
+    depends_on:
+      - vectordb
+    env_file:
+      - .env
+volumes:
+  pgdata2:
+  mongo_data:
+  meili_data:
